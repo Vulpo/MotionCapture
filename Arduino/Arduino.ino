@@ -195,12 +195,12 @@ void setup() {
         // get expected DMP packet size for later comparison
         packetSize_2 = mpu_2.dmpGetFIFOPacketSize();
 
-        mpu_1.setXGyroOffset(-5);
-        mpu_1.setYGyroOffset(-60);
-        mpu_1.setZGyroOffset(69);
-        mpu_1.setXAccelOffset(-1088);
-        mpu_1.setYAccelOffset(580);
-        mpu_1.setZAccelOffset(1936);
+        mpu_2.setXGyroOffset(-5);
+        mpu_2.setYGyroOffset(-60);
+        mpu_2.setZGyroOffset(69);
+        mpu_2.setXAccelOffset(-1088);
+        mpu_2.setYAccelOffset(580);
+        mpu_2.setZAccelOffset(1936);
         
     }else {
         // ERROR!
@@ -260,6 +260,7 @@ void loop() {
          // reset so we can continue cleanly
          mpu_1.resetFIFO();
          Serial.println(F("FIFO 1 overflow!"));
+         digitalWrite(LED_PIN, false);
           TEST Serial.print('$');
      // otherwise, check for DMP data ready interrupt (this should happen frequently)
      } else if (mpuIntStatus_1 & 0x02) {
@@ -294,6 +295,7 @@ void loop() {
          // reset so we can continue cleanly
          mpu_2.resetFIFO();
          Serial.println(F("FIFO 2 overflow!"));
+         digitalWrite(LED_PIN, false);
       TEST Serial.print('£');
      // otherwise, check for DMP data ready interrupt (this should happen frequently)
      } else if (mpuIntStatus_2 & 0x02) {
