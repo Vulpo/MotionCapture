@@ -1,10 +1,10 @@
-const bool debug = false;
+const bool debug = false; //basically if true, data is printed on serial instead of sent by XBee
 #define TEST if(debug)
 
 // I2Cdev and MPU6050 must be installed as libraries, or else the .cpp/.h files
 // for both classes must be in the include path of your project
 #include "I2Cdev.h"
-
+#include "MemoryFree.h"
 #include <SoftwareSerial.h>
 #include "MPU6050_6Axis_MotionApps20.h"
 //#include "MPU6050.h" // not necessary if using MotionApps include file
@@ -214,6 +214,8 @@ void setup() {
 
     // configure LED for output
     pinMode(LED_PIN, OUTPUT);
+    
+    TEST {} else{  digitalWrite(LED_PIN, true); }
 }
 
 
@@ -223,102 +225,112 @@ void setup() {
 // ================================================================
 uint8_t ctrl=0;
 void loop() {
-      //------------------
-      TEST{
-        if(ctrl>=10){
-          Serial.println('|');
+        if(ctrl>=125){ //LED blinks every 5 seconds, for the good mood.
           ctrl=0;
               // blink LED to indicate activity
               blinkState = !blinkState;
               digitalWrite(LED_PIN, blinkState);
         }
         else{
-          Serial.print('|');
           ctrl++;
         }
-      } else{
-          digitalWrite(LED_PIN, true); 
-      }
-      //------------------
+  
       
      // if programming failed, don't try to do anything
      if (!dmpReady) return;
 
      // wait for MPU interrupt or extra packet(s) available.
      //Processing can be done meanwhile to reduce the processing time (wait+process merged)
-      TEST Serial.print('1');
-     while ( !mpuInterrupt_1 && fifoCount_1 < packetSize_1){
-         delay(20) ;
+     while ( !mpuInterrupt_1){
+              delay(20); //we don't need to exterminate the Arduino CPU. (doesn't cause latency problem, coz' 20<40ms and it's a while(), not a do_while())
      }
-      TEST Serial.print('a');
-     mpuInterrupt_1 = false;
+     
      mpuIntStatus_1 = mpu_1.getIntStatus();
-     fifoCount_1 = mpu_1.getFIFOCount();
-      TEST Serial.print('b');
-     // check for overflow (this should never happen unless our code is too inefficient)
-     if ((mpuIntStatus_1 & 0x10) || fifoCount_1 == 1024) {
-         // reset so we can continue cleanly
-         mpu_1.resetFIFO();
-         Serial.println(F("FIFO 1 overflow!"));
-         digitalWrite(LED_PIN, false);
-          TEST Serial.print('$');
-     // otherwise, check for DMP data ready interrupt (this should happen frequently)
-     } else if (mpuIntStatus_1 & 0x02) {
+     
+
+     // check for DMP data ready interrupt (this should happen frequently)
+     if (mpuIntStatus_1 & 0x02) {
          // wait for correct available data length, should be a VERY short wait
-         while (fifoCount_1 < packetSize_1) fifoCount_1 = mpu_1.getFIFOCount();
-          TEST Serial.print('c');
+         do{
+           fifoCount_1 = mpu_1.getFIFOCount();
+         }while (fifoCount_1 < packetSize_1);
          // read a packet from FIFO
-         if (packetSize_1 >= 64) Serial.println("Packet size incoherence 1");
          mpu_1.getFIFOBytes(fifoBuffer_1, packetSize_1);
-        
-         // track FIFO count here in case there is > 1 packet available
-         // (this lets us immediately read more without waiting for an interrupt)
-         fifoCount_1 -= packetSize_1;
-         //mpu_1.resetFIFO();// Parce que j'arrive pas à trouver une fonction setFIFOsize(). Juste espérer qu'elle ne se remplit pas pendant l'exécution de la ligne précédente...
-          TEST Serial.print('d');
      }
-     serializeMeasuresToBuffer(1);
     
-      TEST Serial.print('2');
-     while ( !mpuInterrupt_2 && fifoCount_1 < packetSize_2){
-         delay(20) ;
-     }
-      TEST Serial.print('a');
-  
-     // reset interrupt flag and get INT_STATUS byte
-     mpuInterrupt_2 = false;
-     mpuIntStatus_2 = mpu_2.getIntStatus();
-      TEST Serial.print('b');
-  
-     // check for overflow (this should never happen unless our code is too inefficient)
-     if ((mpuIntStatus_2 & 0x10) || fifoCount_2 == 1024) {
-         // reset so we can continue cleanly
-         mpu_2.resetFIFO();
-         Serial.println(F("FIFO 2 overflow!"));
-         digitalWrite(LED_PIN, false);
-      TEST Serial.print('£');
-     // otherwise, check for DMP data ready interrupt (this should happen frequently)
-     } else if (mpuIntStatus_2 & 0x02) {
-         // wait for correct available data length, should be a VERY short wait
-      
-         while (fifoCount_2 < packetSize_2) fifoCount_2 = mpu_2.getFIFOCount();
-          TEST Serial.print('c');
-         // read a packet from FIFO
-         if (packetSize_2 >= 64) Serial.println("Packet size incoherence 2");
-         mpu_2.getFIFOBytes(fifoBuffer_2, packetSize_2);
-          
-         // track FIFO count here in case there is > 1 packet available
-         // (this lets us immediately read more without waiting for an interrupt)
-         fifoCount_2 -= packetSize_2;
-         //mpu_2.resetFIFO();// Parce que j'arrive pas à trouver une fonction setFIFOsize(). Juste espérer qu'elle ne se remplit pas pendant l'exécution de la ligne précédente...
-      TEST Serial.print('d');
+    TEST{  printAngleSerial(1);  
+    }else{  
+    serializeMeasuresToBuffer(1); 
     }
+
+    mpuInterrupt_1 = false;
+    mpu_1.resetFIFO(); // to simulate a fifo of size "ONE MEASURE". We don't need to count the FIFO size if we let this line be.
+    
+     while ( !mpuInterrupt_2 ){
+              delay(20);
+     }
+
+    mpuIntStatus_2 = mpu_2.getIntStatus();
+    //check for DMP data ready interrupt (this should happen frequently)
+     if (mpuIntStatus_2 & 0x02) {
+         // wait for correct available data length, should be a VERY short wait
+        do{
+          fifoCount_2 = mpu_2.getFIFOCount();
+        }while (fifoCount_2 < packetSize_2); 
+         // read a packet from FIFO
+         mpu_2.getFIFOBytes(fifoBuffer_2, packetSize_2);
+     }
   
-    serializeMeasuresToBuffer(2);
+    TEST{  printAngleSerial(2);
+    }else{  
+    serializeMeasuresToBuffer(2);  
     sendBuffer();
-    TEST Serial.print('.');
+    }
+    
+    mpuInterrupt_2 = false;
+    mpu_2.resetFIFO(); // to simulate a fifo of size "ONE MEASURE". We don't need to count the FIFO size if we let this line be.
 }
 
+/*
+Writes the angles read to the computer's serial, works like serializeMeasuresToBuffer(uint8-t) but used to debug. Prints readable values.
+*/
+void printAngleSerial(uint8_t index){
+    if (index != 1 && index != 2){
+       Serial.println("Error index.");
+       return;
+    }
+    
+    if(index==1){
+        mpu_1.dmpGetQuaternion(&q, fifoBuffer_1);
+        mpu_1.dmpGetGravity(&gravity, &q);
+        mpu_1.dmpGetYawPitchRoll(ypr, &q, &gravity);
+    }
+    else{
+        mpu_2.dmpGetQuaternion(&q, fifoBuffer_2);
+        mpu_2.dmpGetGravity(&gravity, &q);
+        mpu_2.dmpGetYawPitchRoll(ypr, &q, &gravity);
+    }
+    measures[0] = ypr[2]*180/M_PI;
+    measures[1] = ypr[0]*180/M_PI;
+    measures[2] = ypr[1]*180/M_PI;
+    
+    if(index==1){
+      Serial.print(measures[0]);  Serial.print("\t"); //roll
+      Serial.print(measures[1]);  Serial.print("\t"); //yaw
+      Serial.print(measures[2]);  Serial.print("\t|\t");//pitch
+    }
+    if(index==2){
+      Serial.print(measures[0]);  Serial.print("\t");
+      Serial.print(measures[1]);  Serial.print("\t");
+      Serial.println(measures[2]);
+    }
+}
+
+/*
+Serialize the angles from the MPU indexed by the argument to serialBuffer[], formatting the data to be ready to be sent by XBee.
+This function does not flush the serialBuffer.
+structure of serialBuffer: [roll1, yaw1, pitch1, roll2, yaw2, pitch2].
+*/
 void serializeMeasuresToBuffer(uint8_t index){
     if (index != 1 && index != 2){
        Serial.println("Error index.");
@@ -351,6 +363,9 @@ void serializeMeasuresToBuffer(uint8_t index){
     }
 }
 
+/*
+Sends the content of serialBuffer[] to the XBee.
+*/
 void sendBuffer(){              
     xbee.println(String((char*)serialBuffer));
     //Serial.println(String ((char*)serialBuffer));

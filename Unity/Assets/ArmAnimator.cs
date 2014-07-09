@@ -7,13 +7,10 @@ public class ArmAnimator : MonoBehaviour {
 	public Transform arm1, arm2;
 
 	private DataAcquisition.DataAcquisition dataCollector;
-	Thread acquisitionThread;
 
 	// Use this for initialization
 	void Start () {
 		dataCollector = new DataAcquisition.DataAcquisition ();
-		//acquisitionThread = new Thread (new ThreadStart (dataCollector.run));
-		//acquisitionThread.Start ();
 	}
 	
 	// Update is called once per frame
